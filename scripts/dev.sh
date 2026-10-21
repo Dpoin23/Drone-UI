@@ -15,7 +15,7 @@ fi
 
 trap 'kill 0' EXIT
 
-(cd "$ROOT/ground-station" && .venv/bin/uvicorn app.main:app --reload --port 8000) &
+(cd "$ROOT/ground-station" && .venv/bin/uvicorn app.main:app --reload --reload-dir app --port 8000) &
 (cd "$ROOT/web" && npm run dev) &
 
 wait

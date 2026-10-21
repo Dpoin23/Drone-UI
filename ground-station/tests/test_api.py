@@ -9,9 +9,21 @@ from app.main import create_app
 
 @pytest.fixture
 def client(tmp_path: Path):
-    settings = Settings(db_path=tmp_path / "test.db", web_dist=tmp_path / "no-dist", token_ttl_hours=1)
+    settings = Settings(
+        db_path=tmp_path / "test.db",
+        uploads_dir=tmp_path / "uploads",
+        web_dist=tmp_path / "no-dist",
+        token_ttl_hours=1,
+        max_image_bytes=1024,
+        max_images_per_issue=3,
+    )
     with TestClient(create_app(settings)) as c:
+        c.uploads_dir = settings.uploads_dir
         yield c
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 
 
 def signup(client: TestClient, username: str = "pilot", password: str = "hunter22!") -> dict:
@@ -73,6 +85,64 @@ def test_issues_are_scoped_per_account(client):
     assert client.get("/api/issues", headers=bob).json() == []
     assert client.patch(f"/api/issues/{issue['id']}", headers=bob, json={"status": "resolved"}).status_code == 404
     assert client.delete(f"/api/issues/{issue['id']}", headers=bob).status_code == 404
+
+
+def test_image_upload_view_delete(client):
+    h = signup(client)
+    issue = client.post("/api/issues", headers=h, json={"category": "security", "title": "Gate open"}).json()
+    assert issue["images"] == []
+
+    res = client.post(
+        f"/api/issues/{issue['id']}/images",
+        headers=h,
+        files=[("files", ("a.png", PNG, "image/png")), ("files", ("b.jpg", JPEG, "image/jpeg"))],
+    )
+    assert res.status_code == 201, res.text
+    images = res.json()["images"]
+    assert [(i["filename"], i["content_type"]) for i in images] == [("a.png", "image/png"), ("b.jpg", "image/jpeg")]
+
+    listed = client.get("/api/issues", headers=h).json()
+    assert [i["id"] for i in listed[0]["images"]] == [i["id"] for i in images]
+
+    img = client.get(f"/api/issues/{issue['id']}/images/{images[0]['id']}", headers=h)
+    assert img.status_code == 200 and img.content == PNG
+    assert img.headers["content-type"] == "image/png"
+
+    after = client.delete(f"/api/issues/{issue['id']}/images/{images[0]['id']}", headers=h).json()
+    assert [i["filename"] for i in after["images"]] == ["b.jpg"]
+
+    client.delete(f"/api/issues/{issue['id']}", headers=h)
+    assert not any(client.uploads_dir.rglob("*.*"))
+
+
+def test_image_validation(client):
+    h = signup(client)
+    issue_id = client.post("/api/issues", headers=h, json={"category": "maintenance", "title": "Debris"}).json()["id"]
+    url = f"/api/issues/{issue_id}/images"
+
+    fake = client.post(url, headers=h, files=[("files", ("x.png", b"<svg onload=alert(1)>", "image/png"))])
+    assert fake.status_code == 415
+
+    big = client.post(url, headers=h, files=[("files", ("big.png", PNG + b"\x00" * 2048, "image/png"))])
+    assert big.status_code == 413
+
+    too_many = client.post(url, headers=h, files=[("files", (f"{n}.png", PNG, "image/png")) for n in range(4)])
+    assert too_many.status_code == 400
+
+
+def test_images_are_scoped_per_account(client):
+    alice = signup(client, "alice")
+    bob = signup(client, "bob")
+    issue_id = client.post("/api/issues", headers=alice, json={"category": "security", "title": "Car"}).json()["id"]
+    image_id = client.post(
+        f"/api/issues/{issue_id}/images", headers=alice, files=[("files", ("a.png", PNG, "image/png"))]
+    ).json()["images"][0]["id"]
+
+    assert client.get(f"/api/issues/{issue_id}/images/{image_id}", headers=bob).status_code == 404
+    assert client.post(
+        f"/api/issues/{issue_id}/images", headers=bob, files=[("files", ("a.png", PNG, "image/png"))]
+    ).status_code == 404
+    assert client.delete(f"/api/issues/{issue_id}/images/{image_id}", headers=bob).status_code == 404
 
 
 def test_stream_settings_persist(client):

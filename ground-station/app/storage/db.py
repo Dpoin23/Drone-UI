@@ -35,6 +35,18 @@ CREATE TABLE IF NOT EXISTS issues (
 
 CREATE INDEX IF NOT EXISTS idx_issues_user_category ON issues (user_id, category, created_at);
 
+CREATE TABLE IF NOT EXISTS issue_images (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    issue_id     INTEGER NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    filename     TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    size_bytes   INTEGER NOT NULL,
+    path         TEXT NOT NULL,
+    created_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_images_issue ON issue_images (issue_id, id);
+
 CREATE TABLE IF NOT EXISTS stream_settings (
     user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     transport  TEXT NOT NULL CHECK (transport IN ('demo', 'webrtc', 'mjpeg')),
@@ -49,7 +61,9 @@ def utcnow() -> str:
 
 
 def connect(db_path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
+    # FastAPI may open and close a request's connection on different threadpool
+    # threads; each connection is still only used by one request at a time.
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
