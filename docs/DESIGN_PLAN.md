@@ -19,12 +19,6 @@ Flight control, autopilot, path planning, and the Pi's on-board software are imp
 5. Stay **agnostic about where image processing runs**. It could run on the Pi, on the ground computer, or split between them, and that decision has not been made yet.
 6. Be developable and testable without the real drone, using a simulator.
 
-### Non-goals (for now)
-
-- Flying or steering the drone. The UI may send a small set of non-flight commands, such as starting a recording or changing the processing mode, but it is not a flight controller.
-- Training detection models. Models are consumed here, not built here.
-- Cloud or multi-site deployment. This is a local, single-site ground station.
-
 ---
 
 ## 2. System overview
@@ -94,7 +88,6 @@ The UI's video component will support **WebRTC as primary and MJPEG as fallback*
 
 ### Hardware considerations for the drone team
 
-- **Pi 4** has a hardware H.264 encoder, which keeps encoding cheap.
 - **Pi 5 has no hardware H.264 encoder.** Encoding happens in software, which is fine at 720p30 but takes CPU away from on-board detection. This affects the on-board versus ground processing decision.
 
 ### Bounding-box overlays
@@ -259,6 +252,8 @@ Every WebSocket message uses the same envelope:
 
 False-positive marks plus their snapshots double as a labeled dataset for improving models later.
 
+**Security risks and maintenance issues** (`issues`, `issue_images`) are the operator-facing log shown in the UI's Security and Maintenance tabs, stored per account. The intent is for them to be **created automatically** from livestream/drone detections: the detection pipeline will call the same storage functions as the API (`app/storage/issues.py`: `insert_issue`, `save_image`) with a non-`manual` `source` and the detection snapshot attached. Manual creation from the UI stays available alongside it.
+
 ---
 
 ## 7. Web UI (`web/`)
@@ -364,9 +359,5 @@ Questions to resolve with the drone team:
 
 1. **Which Pi model, and is there an accelerator** (Hailo AI Kit, Coral)? This largely decides on-board vs ground processing.
 2. **Camera and resolution** (Pi Camera Module 3, HQ camera, thermal)? Is night operation required?
-3. **Does the drone have GPS / position data** available to the Pi (for example via MAVLink from the flight controller)? This determines whether the map and geotagged detections are possible.
-4. **Wi-Fi topology and range:** Pi as access point vs site network, antenna setup, expected maximum distance from the ground station.
-5. **Detection taxonomy:** the concrete list of security and maintenance classes, and whether existing models or datasets exist for them.
-6. **Who owns the drone agent's WebSocket server:** does the drone team implement the contract above, or should this repo provide a reference agent they can run on the Pi?
-7. **Recording:** should full flights be recorded, and where — on the Pi's SD card, on the ground, or both?
-8. **Single or multiple drones** in the future? The current design assumes one, but `drone_id` is carried everywhere so it can expand.
+3. **Detection taxonomy:** the concrete list of security and maintenance classes, and whether existing models or datasets exist for them.
+4. **Recording:** should full flights be recorded, and where — on the Pi's SD card, on the ground, or both?
