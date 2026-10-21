@@ -14,9 +14,12 @@ import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { timeAgo } from '../../lib/format'
 import type { Category, StreamSettings, StreamTransport } from '../../lib/types'
+import { Modal } from '../../components/Modal'
 import { IssueForm } from '../issues/IssueForm'
+import { IssueThumb } from '../issues/ImageViews'
 import { OPEN_STATUSES, severityDot } from '../issues/meta'
 import { useIssues } from '../issues/useIssues'
+import { captureFrame } from './snapshot'
 import { VideoPlayer, type StreamStatus } from './VideoPlayer'
 
 const transports: { id: StreamTransport; label: string; placeholder: string; hint: string }[] = [
@@ -49,10 +52,10 @@ export function LivestreamPage() {
   const [saving, setSaving] = useState(false)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [status, setStatus] = useState<{ status: StreamStatus; message?: string }>({ status: 'idle' })
-  const [quickLog, setQuickLog] = useState<Category | null>(null)
+  const [quickLog, setQuickLog] = useState<{ category: Category; files: File[] } | null>(null)
   const [now, setNow] = useState(() => new Date())
   const stageRef = useRef<HTMLDivElement>(null)
-  const { issues, loading: issuesLoading, create } = useIssues()
+  const { issues, loading: issuesLoading, create, addImages } = useIssues()
 
   useEffect(() => {
     api
@@ -70,6 +73,17 @@ export function LivestreamPage() {
   }, [])
 
   const onStatus = useCallback((s: StreamStatus, message?: string) => setStatus({ status: s, message }), [])
+
+  function openSettings() {
+    if (saved) setDraft(saved)
+    setSettingsError(null)
+    setShowSettings(true)
+  }
+
+  async function startQuickLog(category: Category) {
+    const snapshot = await captureFrame(stageRef.current)
+    setQuickLog({ category, files: snapshot ? [snapshot] : [] })
+  }
 
   async function saveSettings() {
     setSaving(true)
@@ -155,10 +169,7 @@ export function LivestreamPage() {
               <span className="font-mono">{saved?.url || transportMeta.hint}</span>
             </div>
             <div className="flex gap-2">
-              <button
-                className={`btn-ghost px-2.5 ${showSettings ? 'bg-white/[0.08]' : ''}`}
-                onClick={() => setShowSettings((v) => !v)}
-              >
+              <button className="btn-ghost px-2.5" onClick={openSettings}>
                 <Settings2 className="size-4" />
                 Stream settings
               </button>
@@ -171,75 +182,95 @@ export function LivestreamPage() {
               </button>
             </div>
           </div>
-
-          {showSettings && (
-            <div className="space-y-4 border-t border-line bg-black/20 p-4">
-              <div className="grid gap-2 sm:grid-cols-3">
-                {transports.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setDraft((d) => ({ ...d, transport: t.id }))}
-                    className={`rounded-xl border p-3 text-left transition ${
-                      draft.transport === t.id
-                        ? 'border-cyan-400/50 bg-cyan-400/[0.06]'
-                        : 'border-line hover:bg-white/[0.03]'
-                    }`}
-                  >
-                    <div className="text-sm font-medium text-zinc-100">{t.label}</div>
-                    <div className="mt-0.5 text-xs text-zinc-500">{t.hint}</div>
-                  </button>
-                ))}
-              </div>
-              {draft.transport !== 'demo' && (
-                <div>
-                  <label className="label" htmlFor="stream-url">Stream URL</label>
-                  <input
-                    id="stream-url"
-                    className="input font-mono"
-                    placeholder={draftMeta.placeholder}
-                    value={draft.url}
-                    onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
-                  />
-                </div>
-              )}
-              {settingsError && <p className="text-sm text-rose-300">{settingsError}</p>}
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-zinc-500">Saved to your account.</p>
-                <div className="flex gap-2">
-                  <button
-                    className="btn-ghost"
-                    onClick={() => {
-                      if (saved) setDraft(saved)
-                      setShowSettings(false)
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button className="btn-primary" onClick={saveSettings} disabled={saving}>
-                    {saving && <Loader2 className="size-4 animate-spin" />}
-                    Save & connect
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
+      <Modal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        title={
+          <span className="flex items-center gap-2">
+            <Settings2 className="size-4 text-cyan-400" />
+            Stream settings
+          </span>
+        }
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void saveSettings()
+          }}
+        >
+          <div className="space-y-2">
+            {transports.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, transport: t.id }))}
+                className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
+                  draft.transport === t.id ? 'border-cyan-400/50 bg-cyan-400/[0.06]' : 'border-line hover:bg-white/[0.03]'
+                }`}
+              >
+                <span
+                  className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border ${
+                    draft.transport === t.id ? 'border-cyan-400' : 'border-zinc-600'
+                  }`}
+                >
+                  {draft.transport === t.id && <span className="size-2 rounded-full bg-cyan-400" />}
+                </span>
+                <span>
+                  <span className="block text-sm font-medium text-zinc-100">{t.label}</span>
+                  <span className="mt-0.5 block text-xs text-zinc-500">{t.hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          {draft.transport !== 'demo' && (
+            <div>
+              <label className="label" htmlFor="stream-url">Stream URL</label>
+              <input
+                id="stream-url"
+                className="input font-mono"
+                required
+                autoFocus
+                placeholder={draftMeta.placeholder}
+                value={draft.url}
+                onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
+              />
+            </div>
+          )}
+          {settingsError && <p className="text-sm text-rose-300">{settingsError}</p>}
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <p className="text-xs text-zinc-500">Saved to your account.</p>
+            <div className="flex gap-2">
+              <button type="button" className="btn-ghost" onClick={() => setShowSettings(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving && <Loader2 className="size-4 animate-spin" />}
+                Save & connect
+              </button>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
       <aside className="space-y-4">
         <div className="panel p-4">
-          <h2 className="mb-3 text-sm font-semibold text-zinc-100">Log from feed</h2>
+          <h2 className="text-sm font-semibold text-zinc-100">Log from feed</h2>
+          <p className="mt-0.5 mb-3 text-xs text-zinc-500">Attaches a snapshot of the current frame.</p>
           <div className="grid grid-cols-2 gap-2">
             <button
               className="flex flex-col items-start gap-2 rounded-xl border border-rose-500/25 bg-rose-500/[0.07] p-3 text-left transition hover:bg-rose-500/[0.12]"
-              onClick={() => setQuickLog('security')}
+              onClick={() => startQuickLog('security')}
             >
               <ShieldAlert className="size-5 text-rose-400" />
               <span className="text-sm font-medium text-rose-100">Security risk</span>
             </button>
             <button
               className="flex flex-col items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-3 text-left transition hover:bg-amber-500/[0.12]"
-              onClick={() => setQuickLog('maintenance')}
+              onClick={() => startQuickLog('maintenance')}
             >
               <Wrench className="size-5 text-amber-400" />
               <span className="text-sm font-medium text-amber-100">Maintenance</span>
@@ -271,6 +302,7 @@ export function LivestreamPage() {
                     ) : (
                       <Wrench className="size-4 shrink-0 text-amber-400" />
                     )}
+                    <IssueThumb issueId={issue.id} images={issue.images} className="h-9 w-12" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm text-zinc-200">{issue.title}</div>
                       <div className="flex items-center gap-2 text-xs text-zinc-500">
@@ -290,7 +322,14 @@ export function LivestreamPage() {
       </aside>
 
       {quickLog && (
-        <IssueForm key={quickLog} open category={quickLog} onClose={() => setQuickLog(null)} onCreate={create} />
+        <IssueForm
+          open
+          category={quickLog.category}
+          initialFiles={quickLog.files}
+          onClose={() => setQuickLog(null)}
+          onCreate={create}
+          onAddImages={addImages}
+        />
       )}
     </div>
   )

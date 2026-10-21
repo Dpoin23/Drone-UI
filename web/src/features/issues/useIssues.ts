@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import type { Category, Issue, IssueDraft, IssuePatch } from '../../lib/types'
+import { forgetImage } from './images'
 
 export function useIssues(category?: Category) {
   const [issues, setIssues] = useState<Issue[]>([])
@@ -37,8 +38,26 @@ export function useIssues(category?: Category) {
 
   const remove = useCallback(async (id: number) => {
     await api.deleteIssue(id)
-    setIssues((prev) => prev.filter((i) => i.id !== id))
+    setIssues((prev) => {
+      prev.find((i) => i.id === id)?.images.forEach((img) => forgetImage(img.id))
+      return prev.filter((i) => i.id !== id)
+    })
   }, [])
 
-  return { issues, loading, error, create, update, remove }
+  const replace = (updated: Issue) => setIssues((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))
+
+  const addImages = useCallback(async (id: number, files: File[]) => {
+    const updated = await api.uploadImages(id, files)
+    replace(updated)
+    return updated
+  }, [])
+
+  const removeImage = useCallback(async (id: number, imageId: number) => {
+    const updated = await api.deleteImage(id, imageId)
+    forgetImage(imageId)
+    replace(updated)
+    return updated
+  }, [])
+
+  return { issues, loading, error, create, update, remove, addImages, removeImage }
 }

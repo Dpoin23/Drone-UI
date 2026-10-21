@@ -1,36 +1,35 @@
-import { AlertCircle, ChevronRight, Inbox, Loader2, MapPin, Plus, Search } from 'lucide-react'
+import { AlertCircle, ChevronRight, Inbox, Loader2, MapPin, Plus, Radar, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { Select } from '../../components/Select'
 import { timeAgo } from '../../lib/format'
 import type { Category, IssueStatus, Severity } from '../../lib/types'
 import { SeverityBadge, StatusBadge } from './Badges'
 import { IssueDrawer } from './IssueDrawer'
 import { IssueForm } from './IssueForm'
-import { OPEN_STATUSES, SEVERITIES, STATUSES, categoryMeta, severityDot, statusLabel } from './meta'
+import { IssueThumb } from './ImageViews'
+import { OPEN_STATUSES, STATUSES, categoryMeta, severityDot, severityOptions, statusLabel } from './meta'
 import { useIssues } from './useIssues'
 
 type StatusFilter = 'active' | 'all' | IssueStatus
+type SortOrder = 'newest' | 'severity'
 
 const severityRank: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 }
 
+const severityFilterOptions = [{ value: 'all' as const, label: 'All severities' }, ...severityOptions]
+const sortOptions: { value: SortOrder; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'severity', label: 'Highest severity' },
+]
+
 export function IssuesPage({ category }: { category: Category }) {
   const meta = categoryMeta[category]
-  const { issues, loading, error, create, update, remove } = useIssues(category)
+  const { issues, loading, error, create, update, remove, addImages, removeImage } = useIssues(category)
   const [creating, setCreating] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active')
   const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all')
-  const [sort, setSort] = useState<'newest' | 'severity'>('newest')
-
-  const stats = useMemo(() => {
-    const active = issues.filter((i) => OPEN_STATUSES.includes(i.status))
-    return {
-      open: issues.filter((i) => i.status === 'open').length,
-      acknowledged: issues.filter((i) => i.status === 'acknowledged').length,
-      urgent: active.filter((i) => i.severity === 'critical' || i.severity === 'high').length,
-      closed: issues.length - active.length,
-    }
-  }, [issues])
+  const [sort, setSort] = useState<SortOrder>('newest')
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -73,14 +72,13 @@ export function IssuesPage({ category }: { category: Category }) {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Open" value={stats.open} tone="text-cyan-300" />
-        <Stat label={statusLabel('acknowledged', category)} value={stats.acknowledged} tone="text-violet-300" />
-        <Stat label="High / critical (active)" value={stats.urgent} tone={stats.urgent ? 'text-rose-300' : 'text-zinc-300'} />
-        <Stat label="Closed" value={stats.closed} tone="text-emerald-300" />
+      <div className="flex items-center gap-2 rounded-lg border border-line bg-white/[0.02] px-3 py-2 text-xs text-zinc-400">
+        <Radar className="size-4 shrink-0 text-cyan-400" />
+        Entries will be created automatically from livestream and drone detections once the drone link is connected.
+        You can still log entries manually.
       </div>
 
-      <div className="panel overflow-hidden">
+      <div className="panel">
         <div className="flex flex-col gap-3 border-b border-line p-3 lg:flex-row lg:items-center">
           <div className="flex gap-1 overflow-x-auto">
             {filterTabs.map((t) => (
@@ -105,26 +103,14 @@ export function IssuesPage({ category }: { category: Category }) {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <select
-              className="input w-auto capitalize"
+            <Select
+              className="w-40"
+              ariaLabel="Filter by severity"
               value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value as Severity | 'all')}
-              aria-label="Filter by severity"
-            >
-              <option value="all">All severities</option>
-              {SEVERITIES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            <select
-              className="input w-auto"
-              value={sort}
-              onChange={(e) => setSort(e.target.value as 'newest' | 'severity')}
-              aria-label="Sort"
-            >
-              <option value="newest">Newest first</option>
-              <option value="severity">Highest severity</option>
-            </select>
+              options={severityFilterOptions}
+              onChange={setSeverityFilter}
+            />
+            <Select className="w-44" ariaLabel="Sort" value={sort} options={sortOptions} onChange={setSort} />
           </div>
         </div>
 
@@ -148,7 +134,7 @@ export function IssuesPage({ category }: { category: Category }) {
               </p>
               <p className="text-sm text-zinc-500">
                 {issues.length === 0
-                  ? 'Entries you log are saved to your account.'
+                  ? 'Entries are saved to your account.'
                   : 'Try a different status, severity, or search.'}
               </p>
             </div>
@@ -160,18 +146,25 @@ export function IssuesPage({ category }: { category: Category }) {
             )}
           </div>
         ) : (
-          <ul className="divide-y divide-line">
+          <ul className="divide-y divide-line overflow-hidden rounded-b-2xl">
             {visible.map((issue) => (
               <li key={issue.id}>
                 <button
                   onClick={() => setSelectedId(issue.id)}
-                  className="group flex w-full items-center gap-4 px-4 py-3.5 text-left transition hover:bg-white/[0.025]"
+                  className="group flex w-full items-center gap-4 px-4 py-3 text-left transition hover:bg-white/[0.025]"
                 >
                   <span className={`size-2 shrink-0 rounded-full ${severityDot[issue.severity]}`} />
+                  {issue.images.length > 0 && <IssueThumb issueId={issue.id} images={issue.images} className="h-12 w-16" />}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-medium text-zinc-100">{issue.title}</span>
                       <span className="shrink-0 font-mono text-xs text-zinc-600">#{issue.id}</span>
+                      {issue.source !== 'manual' && (
+                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-cyan-400/10 px-1.5 py-0.5 text-[10px] font-medium text-cyan-300 uppercase ring-1 ring-cyan-400/25 ring-inset">
+                          <Radar className="size-3" />
+                          Auto
+                        </span>
+                      )}
                     </div>
                     <div className="mt-0.5 flex items-center gap-3 text-xs text-zinc-500">
                       {issue.location && (
@@ -200,7 +193,13 @@ export function IssuesPage({ category }: { category: Category }) {
         )}
       </div>
 
-      <IssueForm open={creating} category={category} onClose={() => setCreating(false)} onCreate={create} />
+      <IssueForm
+        open={creating}
+        category={category}
+        onClose={() => setCreating(false)}
+        onCreate={create}
+        onAddImages={addImages}
+      />
       {selected && (
         <IssueDrawer
           key={selected.id}
@@ -208,17 +207,10 @@ export function IssuesPage({ category }: { category: Category }) {
           onClose={() => setSelectedId(null)}
           onUpdate={update}
           onDelete={remove}
+          onAddImages={addImages}
+          onRemoveImage={removeImage}
         />
       )}
-    </div>
-  )
-}
-
-function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
-  return (
-    <div className="panel px-4 py-3">
-      <div className="text-xs font-medium tracking-wide text-zinc-500 uppercase">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold tabular-nums ${tone}`}>{value}</div>
     </div>
   )
 }

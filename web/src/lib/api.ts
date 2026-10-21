@@ -33,11 +33,11 @@ function errorMessage(body: unknown, fallback: string): string {
   return fallback
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function send(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
   const token = tokenStore.get()
   if (token) headers.set('Authorization', `Bearer ${token}`)
-  if (init.body) headers.set('Content-Type', 'application/json')
+  if (typeof init.body === 'string') headers.set('Content-Type', 'application/json')
 
   let res: Response
   try {
@@ -46,13 +46,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(0, 'Cannot reach the ground station service')
   }
 
-  if (res.status === 204) return undefined as T
-  const body = await res.json().catch(() => null)
   if (!res.ok) {
+    const body = await res.json().catch(() => null)
     if (res.status === 401 && token) onUnauthorized?.()
     throw new ApiError(res.status, errorMessage(body, `Request failed (${res.status})`))
   }
-  return body as T
+  return res
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await send(path, init)
+  if (res.status === 204) return undefined as T
+  return (await res.json()) as T
 }
 
 type AuthResponse = { token: string; user: User }
@@ -72,6 +77,16 @@ export const api = {
   updateIssue: (id: number, patch: IssuePatch) =>
     request<Issue>(`/api/issues/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteIssue: (id: number) => request<void>(`/api/issues/${id}`, { method: 'DELETE' }),
+
+  uploadImages: (issueId: number, files: File[]) => {
+    const form = new FormData()
+    for (const f of files) form.append('files', f, f.name)
+    return request<Issue>(`/api/issues/${issueId}/images`, { method: 'POST', body: form })
+  },
+  deleteImage: (issueId: number, imageId: number) =>
+    request<Issue>(`/api/issues/${issueId}/images/${imageId}`, { method: 'DELETE' }),
+  fetchImage: async (issueId: number, imageId: number) =>
+    (await send(`/api/issues/${issueId}/images/${imageId}`)).blob(),
 
   getStreamSettings: () => request<StreamSettings>('/api/stream-settings'),
   putStreamSettings: (settings: StreamSettings) =>

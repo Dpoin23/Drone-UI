@@ -26,6 +26,16 @@ export const statusStyle: Record<IssueStatus, string> = {
   false_positive: 'bg-zinc-500/10 text-zinc-400 ring-zinc-500/30',
 }
 
+export const severityOptions = SEVERITIES.map((s) => ({
+  value: s,
+  label: s[0].toUpperCase() + s.slice(1),
+  dot: severityDot[s],
+}))
+
+export function sourceLabel(source: string): string {
+  return source === 'manual' ? 'Logged manually' : `Auto-detected (${source})`
+}
+
 export function statusLabel(status: IssueStatus, category: Category): string {
   switch (status) {
     case 'open':

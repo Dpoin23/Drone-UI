@@ -1,19 +1,26 @@
-import { AlertCircle, Loader2, Trash2 } from 'lucide-react'
+import { AlertCircle, Loader2, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { Modal } from '../../components/Modal'
+import { Select } from '../../components/Select'
 import { formatDateTime } from '../../lib/format'
 import type { Issue, IssuePatch, IssueStatus } from '../../lib/types'
 import { SeverityBadge, StatusBadge } from './Badges'
-import { SEVERITIES, STATUSES, statusLabel, statusStyle } from './meta'
+import { ImageDropzone, IssueImg, Lightbox } from './ImageViews'
+import { validateImageFiles } from './images'
+import { STATUSES, severityOptions, sourceLabel, statusLabel, statusStyle } from './meta'
 
 type Props = {
   issue: Issue
   onClose: () => void
   onUpdate: (id: number, patch: IssuePatch) => Promise<unknown>
   onDelete: (id: number) => Promise<unknown>
+  onAddImages: (id: number, files: File[]) => Promise<unknown>
+  onRemoveImage: (id: number, imageId: number) => Promise<unknown>
 }
 
-export function IssueDrawer({ issue, onClose, onUpdate, onDelete }: Props) {
+export function IssueDrawer({ issue, onClose, onUpdate, onDelete, onAddImages, onRemoveImage }: Props) {
+  const [viewing, setViewing] = useState<number | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState<IssuePatch>(() => ({
     title: issue.title,
     description: issue.description,
@@ -49,14 +56,59 @@ export function IssueDrawer({ issue, onClose, onUpdate, onDelete }: Props) {
     onClose()
   })
 
+  async function upload(picked: File[]) {
+    const { ok, error: problem } = validateImageFiles(picked)
+    setError(problem)
+    if (!ok.length) return
+    setUploading(true)
+    try {
+      await onAddImages(issue.id, ok)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <Modal open side="right" onClose={onClose} title={`#${issue.id} · ${issue.title}`}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-2">
           <SeverityBadge severity={issue.severity} />
           <StatusBadge status={issue.status} category={issue.category} />
-          <span className="text-xs text-zinc-500">Source: {issue.source}</span>
+          <span className="text-xs text-zinc-500">{sourceLabel(issue.source)}</span>
         </div>
+
+        <section>
+          <div className="label">Images</div>
+          <div className="grid grid-cols-3 gap-2">
+            {issue.images.map((img, i) => (
+              <div key={img.id} className="group relative aspect-square overflow-hidden rounded-lg ring-1 ring-line">
+                <button type="button" className="h-full w-full" onClick={() => setViewing(i)} aria-label={`View ${img.filename}`}>
+                  <IssueImg issueId={issue.id} image={img} className="h-full w-full transition group-hover:scale-105" />
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => run(() => onRemoveImage(issue.id, img.id))}
+                  className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-zinc-200 opacity-0 transition group-hover:opacity-100 hover:text-rose-300 focus:opacity-100"
+                  aria-label={`Delete ${img.filename}`}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ))}
+            {uploading ? (
+              <div className="grid aspect-square place-items-center rounded-lg border border-dashed border-white/15 text-zinc-500">
+                <Loader2 className="size-5 animate-spin" />
+              </div>
+            ) : (
+              <div className={issue.images.length ? 'aspect-square' : 'col-span-3'}>
+                <ImageDropzone compact={issue.images.length > 0} onFiles={upload} />
+              </div>
+            )}
+          </div>
+        </section>
 
         <section>
           <div className="label">Status</div>
@@ -90,16 +142,12 @@ export function IssueDrawer({ issue, onClose, onUpdate, onDelete }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label" htmlFor="edit-severity">Severity</label>
-              <select
+              <Select
                 id="edit-severity"
-                className="input capitalize"
-                value={form.severity}
-                onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as Issue['severity'] }))}
-              >
-                {SEVERITIES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+                value={form.severity ?? issue.severity}
+                options={severityOptions}
+                onChange={(v) => setForm((f) => ({ ...f, severity: v }))}
+              />
             </div>
             <div>
               <label className="label" htmlFor="edit-location">Location</label>
@@ -167,6 +215,16 @@ export function IssueDrawer({ issue, onClose, onUpdate, onDelete }: Props) {
           )}
         </div>
       </div>
+
+      {viewing !== null && (
+        <Lightbox
+          issueId={issue.id}
+          images={issue.images}
+          index={Math.min(viewing, issue.images.length - 1)}
+          onIndex={setViewing}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </Modal>
   )
 }
