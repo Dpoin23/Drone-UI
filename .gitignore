@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Ground-station runtime data (SQLite DB, snapshots)
+ground-station/data/
+
+# Node
+node_modules/
+web/dist/
+
+.DS_Store
