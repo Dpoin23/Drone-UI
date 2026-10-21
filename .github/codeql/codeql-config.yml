@@ -1,0 +1,10 @@
+name: Drone-UI CodeQL config
+
+queries:
+  - uses: security-and-quality
+
+paths-ignore:
+  - '**/node_modules'
+  - web/dist
+  - ground-station/.venv
+  - ground-station/data

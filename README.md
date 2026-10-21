@@ -82,8 +82,9 @@ Then open http://localhost:8000. Use `--host 0.0.0.0` only on a trusted LAN, suc
 ## Testing
 
 ```bash
-# Backend API tests: auth, per-account isolation, issue CRUD, image uploads, stream settings
+# Backend: lint, then API tests (auth, per-account isolation, issue CRUD, image uploads, stream settings)
 cd ground-station
+.venv/bin/ruff check .
 .venv/bin/pytest
 
 # Frontend type-check + production build, and lint

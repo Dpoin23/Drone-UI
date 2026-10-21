@@ -3,7 +3,7 @@ import hmac
 import secrets
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
@@ -37,7 +37,7 @@ def _hash_token(token: str) -> str:
 
 def issue_token(conn: sqlite3.Connection, user_id: int, ttl_hours: int) -> str:
     token = secrets.token_urlsafe(32)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     conn.execute(
         "INSERT INTO auth_tokens (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
         (_hash_token(token), user_id, utcnow(), (now + timedelta(hours=ttl_hours)).isoformat()),
@@ -86,6 +86,6 @@ def current_user(
         """,
         (_hash_token(token),),
     ).fetchone()
-    if row is None or datetime.fromisoformat(row["expires_at"]) < datetime.now(timezone.utc):
+    if row is None or datetime.fromisoformat(row["expires_at"]) < datetime.now(UTC):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired, please sign in again")
     return CurrentUser(id=row["id"], username=row["username"], token=token)
