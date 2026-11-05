@@ -123,7 +123,7 @@ Where detection runs is undecided, so the design treats **detection sources as p
       def detect(self, frame: np.ndarray, ts: float) -> list[RawDetection]: ...
   ```
 
-  Implementations live in `ground-station/app/inference/` and are selected by config. Model weights are not committed.
+  Implementations live in `ground-station/app/vision/` and are selected by config. Model weights are not committed. **Implemented** with laptop-based inference: a latest-frame buffer feeding two YOLOv8n workers (intruder detection with ByteTrack, maintenance detection with defect classification) at rates set by the flight mode. Frames come from the ground station's own capture or from the browser, so it works with every feed type. See [VISION_PIPELINE.md](VISION_PIPELINE.md).
 - **`hybrid`:** on-board detections arrive marked `status: "candidate"`. The ground detector re-evaluates the attached snapshot and either promotes it to `confirmed` or drops it.
 
 The active mode is a runtime setting, shown in the UI and changeable from the settings page. The drone agent should expose a command to enable or disable its own detector.
@@ -345,7 +345,7 @@ Drone-UI/
 2. **M1 – Live video.** UI plays the simulator stream over WebRTC with MJPEG fallback, plus a connection settings page.
 3. **M2 – Live data.** The ground service connects to the drone agent, and the UI shows the status bar, link indicator, and live detection feed with overlays.
 4. **M3 – Logging and review.** SQLite persistence, snapshots, sessions, history page, review actions, export.
-5. **M4 – Ground-side processing.** RTSP frame grabber, `Detector` interface with one baseline model (for example a YOLO nano/small via Ultralytics or ONNX Runtime), category mapping, de-duplication. Mode switching between `off`, `onboard`, and `ground`.
+5. **M4 – Ground-side processing.** RTSP frame grabber, `Detector` interface with one baseline model (for example a YOLO nano/small via Ultralytics or ONNX Runtime), category mapping, de-duplication. Mode switching between `off`, `onboard`, and `ground`. *Ground mode is implemented; see [VISION_PIPELINE.md](VISION_PIPELINE.md). Trained VisDrone and MBDD2025 weights, and `onboard` mode, are still to come.*
 6. **M5 – Real drone integration.** Point at the real Pi, measure latency, bandwidth, and range, and tune.
 7. **M6 – Extras.** Map and route view, `hybrid` mode, annotated stream, zones, alert sounds, recording, desktop packaging.
 
