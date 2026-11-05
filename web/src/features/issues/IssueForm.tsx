@@ -24,7 +24,7 @@ function previewUrl(file: File): string {
     url = URL.createObjectURL(file)
     previews.set(file, url)
   }
-  return url
+  return encodeURI(url)
 }
 
 function releasePreview(file: File) {
