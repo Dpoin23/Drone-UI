@@ -73,11 +73,7 @@ def _bearer_token(authorization: str | None) -> str:
     return authorization.split(" ", 1)[1].strip()
 
 
-def current_user(
-    authorization: str | None = Header(default=None),
-    conn: sqlite3.Connection = Depends(get_db),
-) -> CurrentUser:
-    token = _bearer_token(authorization)
+def user_for_token(conn: sqlite3.Connection, token: str) -> CurrentUser | None:
     row = conn.execute(
         """
         SELECT u.id, u.username, t.expires_at
@@ -87,5 +83,15 @@ def current_user(
         (_hash_token(token),),
     ).fetchone()
     if row is None or datetime.fromisoformat(row["expires_at"]) < datetime.now(UTC):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired, please sign in again")
+        return None
     return CurrentUser(id=row["id"], username=row["username"], token=token)
+
+
+def current_user(
+    authorization: str | None = Header(default=None),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> CurrentUser:
+    user = user_for_token(conn, _bearer_token(authorization))
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired, please sign in again")
+    return user

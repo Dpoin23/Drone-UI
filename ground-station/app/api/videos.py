@@ -18,6 +18,7 @@ from ..storage.videos import (
     start_import,
     video_path,
 )
+from .vision import reapply_session
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -168,4 +169,5 @@ def delete_video(
         (user.id, str(video_id)),
     )
     conn.commit()
+    reapply_session(request.app.state.vision, conn, request.app.state.settings, user.id)
     delete_video_files(request.app.state.settings.videos_dir, row["path"])

@@ -1,11 +1,12 @@
 import sqlite3
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from ..auth import CurrentUser, current_user, get_db
 from ..storage.db import utcnow
+from .vision import reapply_session
 
 router = APIRouter(prefix="/api/stream-settings", tags=["stream"])
 
@@ -30,6 +31,7 @@ def get_stream_settings(
 @router.put("", response_model=StreamSettings)
 def put_stream_settings(
     body: StreamSettings,
+    request: Request,
     user: CurrentUser = Depends(current_user),
     conn: sqlite3.Connection = Depends(get_db),
 ):
@@ -49,4 +51,5 @@ def put_stream_settings(
         (user.id, body.transport, body.url, utcnow()),
     )
     conn.commit()
+    reapply_session(request.app.state.vision, conn, request.app.state.settings, user.id)
     return body

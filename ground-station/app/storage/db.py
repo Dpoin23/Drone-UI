@@ -74,6 +74,12 @@ CREATE TABLE IF NOT EXISTS videos (
 
 CREATE INDEX IF NOT EXISTS idx_videos_user ON videos (user_id, created_at);
 
+CREATE TABLE IF NOT EXISTS vision_settings (
+    user_id       INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    settings_json TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS server_secrets (
     name  TEXT PRIMARY KEY,
     value BLOB NOT NULL

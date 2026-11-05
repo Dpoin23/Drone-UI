@@ -3,10 +3,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from .api import auth_routes, issues, stream, videos
+from .api import auth_routes, issues, stream, videos, vision
 from .config import Settings, load_settings
 from .storage.db import connect, init_db, server_secret
 from .storage.videos import fail_interrupted_imports
+from .vision.session import VisionManager
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -22,14 +23,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             conn.close()
         yield
+        app.state.vision.shutdown()
 
     app = FastAPI(title="Drone-UI ground station", lifespan=lifespan)
     app.state.settings = settings
+    app.state.vision = VisionManager(settings)
 
     app.include_router(auth_routes.router)
     app.include_router(issues.router)
     app.include_router(stream.router)
     app.include_router(videos.router)
+    app.include_router(vision.router)
 
     @app.get("/api/health")
     def health():
