@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import json
 import sqlite3
 import time
@@ -295,13 +294,12 @@ async def live(ws: WebSocket):
             except InvalidFrame:
                 continue
     except (WebSocketDisconnect, RuntimeError):
+        # The client went away or the socket failed; cleanup happens in ``finally``.
         pass
     finally:
         for task in tasks:
             task.cancel()
-        for task in tasks:
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await task
+        await asyncio.gather(*tasks, return_exceptions=True)
         hub.unsubscribe(sub)
         current = manager.get(user.id)
         if current:

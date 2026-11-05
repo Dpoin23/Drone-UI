@@ -80,7 +80,8 @@ def test_issue_crud_and_status_transitions(client):
     reopened = client.patch(f"/api/issues/{created['id']}", headers=h, json={"status": "open"}).json()
     assert reopened["resolved_at"] is None
 
-    assert client.delete(f"/api/issues/{created['id']}", headers=h).status_code == 204
+    deleted = client.delete(f"/api/issues/{created['id']}", headers=h)
+    assert deleted.status_code == 204
     assert len(client.get("/api/issues", headers=h).json()) == 1
 
 
@@ -91,7 +92,8 @@ def test_issues_are_scoped_per_account(client):
 
     assert client.get("/api/issues", headers=bob).json() == []
     assert client.patch(f"/api/issues/{issue['id']}", headers=bob, json={"status": "resolved"}).status_code == 404
-    assert client.delete(f"/api/issues/{issue['id']}", headers=bob).status_code == 404
+    deleted = client.delete(f"/api/issues/{issue['id']}", headers=bob)
+    assert deleted.status_code == 404
 
 
 def test_image_upload_view_delete(client):
@@ -149,7 +151,8 @@ def test_images_are_scoped_per_account(client):
     assert client.post(
         f"/api/issues/{issue_id}/images", headers=bob, files=[("files", ("a.png", PNG, "image/png"))]
     ).status_code == 404
-    assert client.delete(f"/api/issues/{issue_id}/images/{image_id}", headers=bob).status_code == 404
+    deleted = client.delete(f"/api/issues/{issue_id}/images/{image_id}", headers=bob)
+    assert deleted.status_code == 404
 
 
 def test_stream_settings_persist(client):
@@ -197,7 +200,8 @@ def test_video_upload_playback_and_delete(client):
     assert client.get(url.replace("sig=", "sig=0")).status_code == 403
     assert client.get(f"/api/videos/{video['id']}/file").status_code == 422
 
-    assert client.delete(f"/api/videos/{video['id']}", headers=h).status_code == 204
+    deleted = client.delete(f"/api/videos/{video['id']}", headers=h)
+    assert deleted.status_code == 204
     assert client.get(url).status_code == 404
     assert not any(client.videos_dir.rglob("*.*"))
 
@@ -218,7 +222,8 @@ def test_videos_are_scoped_per_account(client):
     assert client.get("/api/videos", headers=bob).json() == []
     assert client.get(f"/api/videos/{video_id}", headers=bob).status_code == 404
     assert client.get(f"/api/videos/{video_id}/playback", headers=bob).status_code == 404
-    assert client.delete(f"/api/videos/{video_id}", headers=bob).status_code == 404
+    deleted = client.delete(f"/api/videos/{video_id}", headers=bob)
+    assert deleted.status_code == 404
     bad = client.put("/api/stream-settings", headers=bob, json={"transport": "video", "url": str(video_id)})
     assert bad.status_code == 400
 

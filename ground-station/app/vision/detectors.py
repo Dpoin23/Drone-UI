@@ -59,15 +59,18 @@ class Detector(Protocol):
     name: str
     device: str
 
-    def detect(self, frame: Frame) -> list[RawDetection]: ...
+    def detect(self, frame: Frame) -> list[RawDetection]:
+        pass
 
-    def reset(self) -> None: ...
+    def reset(self) -> None:
+        pass
 
 
 class CropClassifier(Protocol):
     name: str
 
-    def classify(self, frame: Frame, bbox: tuple[float, float, float, float]) -> tuple[str, float] | None: ...
+    def classify(self, frame: Frame, bbox: tuple[float, float, float, float]) -> tuple[str, float] | None:
+        pass
 
 
 class VisionUnavailable(RuntimeError):

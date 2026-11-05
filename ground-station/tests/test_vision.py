@@ -234,7 +234,8 @@ def test_browser_frames_produce_detections_alerts_and_issues(app_client):
     # Inference runs on a subset of frames, never more than the target rate allows.
     assert len(app_client.detectors["intruder"].frames) < 25
 
-    assert app_client.delete("/api/vision/session", headers=h).status_code == 204
+    stopped = app_client.delete("/api/vision/session", headers=h)
+    assert stopped.status_code == 204
     assert app_client.get("/api/vision/session", headers=h).json() == {"running": False}
 
 

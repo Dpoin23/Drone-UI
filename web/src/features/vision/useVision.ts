@@ -71,9 +71,13 @@ export function useVision(onAlert?: (alert: VisionAlert) => void) {
               setStats(null)
             }
             break
-          case 'detections':
-            detections.current[msg.stream as VisionStream] = { event: msg, receivedAt: performance.now() }
+          case 'detections': {
+            const stream: unknown = msg.stream
+            if (stream === 'intruder' || stream === 'maintenance') {
+              detections.current[stream] = { event: msg, receivedAt: performance.now() }
+            }
             break
+          }
           case 'stats':
             setStats(msg)
             break
