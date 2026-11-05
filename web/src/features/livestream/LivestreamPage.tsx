@@ -13,13 +13,14 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { timeAgo } from '../../lib/format'
-import type { Category, StreamSettings, StreamTransport } from '../../lib/types'
+import type { Category, StreamSettings, StreamTransport, Video } from '../../lib/types'
 import { Modal } from '../../components/Modal'
 import { IssueForm } from '../issues/IssueForm'
 import { IssueThumb } from '../issues/ImageViews'
 import { OPEN_STATUSES, severityDot } from '../issues/meta'
 import { useIssues } from '../issues/useIssues'
 import { captureFrame } from './snapshot'
+import { VideoLibrary } from './VideoLibrary'
 import { VideoPlayer, type StreamStatus } from './VideoPlayer'
 
 const transports: { id: StreamTransport; label: string; placeholder: string; hint: string }[] = [
@@ -35,6 +36,12 @@ const transports: { id: StreamTransport; label: string; placeholder: string; hin
     label: 'MJPEG',
     placeholder: 'http://drone.local:8080/stream.mjpg',
     hint: 'Simple fallback stream over HTTP. Higher bandwidth.',
+  },
+  {
+    id: 'video',
+    label: 'Test video',
+    placeholder: '',
+    hint: 'Play a YouTube link or an uploaded file through the feed, for testing image processing.',
   },
 ]
 
@@ -53,6 +60,7 @@ export function LivestreamPage() {
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [status, setStatus] = useState<{ status: StreamStatus; message?: string }>({ status: 'idle' })
   const [quickLog, setQuickLog] = useState<{ category: Category; files: File[] } | null>(null)
+  const [testVideo, setTestVideo] = useState<Video | null>(null)
   const [now, setNow] = useState(() => new Date())
   const stageRef = useRef<HTMLDivElement>(null)
   const { issues, loading: issuesLoading, create, addImages } = useIssues()
@@ -104,7 +112,16 @@ export function LivestreamPage() {
   const activeMaintenance = active.filter((i) => i.category === 'maintenance')
   const transportMeta = transports.find((t) => t.id === (saved?.transport ?? 'demo'))!
   const draftMeta = transports.find((t) => t.id === draft.transport)!
-  const ui = statusUi[status.status]
+  const isTestVideo = saved?.transport === 'video'
+  const ui = isTestVideo && status.status === 'live' ? { ...statusUi.live, label: 'Ready' } : statusUi[status.status]
+
+  function chooseTransport(transport: StreamTransport) {
+    setDraft((d) => {
+      // A library video id and a stream URL aren't interchangeable, so don't carry one over as the other.
+      const carry = (transport === 'video') === (d.transport === 'video') ? d.url : ''
+      return { transport, url: transport === saved?.transport ? saved.url : carry }
+    })
+  }
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -128,7 +145,7 @@ export function LivestreamPage() {
         <div className="panel overflow-hidden">
           <div ref={stageRef} className="group relative aspect-video bg-black">
             {saved ? (
-              <VideoPlayer settings={saved} onStatus={onStatus} />
+              <VideoPlayer settings={saved} onStatus={onStatus} onVideo={setTestVideo} />
             ) : (
               <div className="grid h-full place-items-center text-zinc-500">
                 <Loader2 className="size-6 animate-spin" />
@@ -147,14 +164,16 @@ export function LivestreamPage() {
 
               <div className="absolute top-6 left-8 flex items-center gap-2 rounded-md bg-black/50 px-2 py-1 font-mono text-xs backdrop-blur">
                 <span className={`size-2 rounded-full ${ui.dot}`} />
-                <span className="text-zinc-200">{saved?.transport === 'demo' ? 'DEMO' : ui.label.toUpperCase()}</span>
+                <span className="text-zinc-200">
+                  {saved?.transport === 'demo' ? 'DEMO' : isTestVideo ? 'TEST VIDEO' : ui.label.toUpperCase()}
+                </span>
               </div>
               <div className="absolute top-6 right-8 rounded-md bg-black/50 px-2 py-1 font-mono text-xs text-zinc-200 backdrop-blur">
                 {now.toISOString().slice(0, 19).replace('T', ' ')}Z
               </div>
 
               {status.status !== 'live' && status.message && (
-                <div className="absolute inset-x-0 bottom-8 flex justify-center">
+                <div className={`absolute inset-x-0 flex justify-center ${isTestVideo ? 'bottom-24' : 'bottom-8'}`}>
                   <div className="flex items-center gap-2 rounded-lg bg-black/70 px-3 py-2 text-sm text-zinc-200 backdrop-blur">
                     <AlertCircle className="size-4 text-amber-400" />
                     {status.message}
@@ -166,7 +185,11 @@ export function LivestreamPage() {
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-3 py-2.5">
             <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <span className="font-mono">{saved?.url || transportMeta.hint}</span>
+              {isTestVideo ? (
+                <span className="truncate">{(saved?.url && testVideo?.title) || transportMeta.hint}</span>
+              ) : (
+                <span className="font-mono">{saved?.url || transportMeta.hint}</span>
+              )}
             </div>
             <div className="flex gap-2">
               <button className="btn-ghost px-2.5" onClick={openSettings}>
@@ -207,7 +230,7 @@ export function LivestreamPage() {
               <button
                 key={t.id}
                 type="button"
-                onClick={() => setDraft((d) => ({ ...d, transport: t.id }))}
+                onClick={() => chooseTransport(t.id)}
                 className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
                   draft.transport === t.id ? 'border-cyan-400/50 bg-cyan-400/[0.06]' : 'border-line hover:bg-white/[0.03]'
                 }`}
@@ -226,7 +249,13 @@ export function LivestreamPage() {
               </button>
             ))}
           </div>
-          {draft.transport !== 'demo' && (
+          {draft.transport === 'video' && (
+            <VideoLibrary
+              selectedId={/^\d+$/.test(draft.url) ? Number(draft.url) : null}
+              onSelect={(id) => setDraft((d) => ({ ...d, url: id === null ? '' : String(id) }))}
+            />
+          )}
+          {(draft.transport === 'webrtc' || draft.transport === 'mjpeg') && (
             <div>
               <label className="label" htmlFor="stream-url">Stream URL</label>
               <input
@@ -247,7 +276,11 @@ export function LivestreamPage() {
               <button type="button" className="btn-ghost" onClick={() => setShowSettings(false)}>
                 Cancel
               </button>
-              <button type="submit" className="btn-primary" disabled={saving}>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={saving || (draft.transport === 'video' && !draft.url)}
+              >
                 {saving && <Loader2 className="size-4 animate-spin" />}
                 Save & connect
               </button>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
-import type { StreamSettings } from '../../lib/types'
+import type { StreamSettings, Video } from '../../lib/types'
 import { DemoFeed } from './DemoFeed'
+import { TestVideoPlayer } from './TestVideoPlayer'
 import { startWhep } from './whep'
 
 export type StreamStatus = 'idle' | 'connecting' | 'live' | 'error'
@@ -8,9 +9,10 @@ export type StreamStatus = 'idle' | 'connecting' | 'live' | 'error'
 type Props = {
   settings: StreamSettings
   onStatus: (status: StreamStatus, message?: string) => void
+  onVideo?: (video: Video | null) => void
 }
 
-export function VideoPlayer({ settings, onStatus }: Props) {
+export function VideoPlayer({ settings, onStatus, onVideo }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const { transport, url } = settings
 
@@ -50,6 +52,11 @@ export function VideoPlayer({ settings, onStatus }: Props) {
   const onDemoReady = useCallback(() => onStatus('live'), [onStatus])
 
   if (transport === 'demo') return <DemoFeed onReady={onDemoReady} />
+
+  if (transport === 'video') {
+    const videoId = /^\d+$/.test(url) ? Number(url) : null
+    return <TestVideoPlayer key={url} videoId={videoId} onStatus={onStatus} onVideo={onVideo} />
+  }
 
   if (transport === 'mjpeg') {
     return url ? (
