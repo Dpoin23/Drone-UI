@@ -6,6 +6,7 @@ their own ``source`` (for example ``"onboard"`` or ``"ground"``) and attach snap
 with :func:`save_image`.
 """
 
+import os
 import shutil
 import sqlite3
 import uuid
@@ -60,8 +61,17 @@ def insert_issue(
     return cur.lastrowid
 
 
+def _safe_path(uploads_dir: Path, relative: str) -> Path:
+    """Resolve ``relative`` under ``uploads_dir``, rejecting any escaping path."""
+    root = os.path.realpath(str(uploads_dir))
+    candidate = os.path.realpath(os.path.join(root, relative))
+    if not candidate.startswith(root + os.sep):
+        raise ValueError("path escapes the uploads directory")
+    return Path(candidate)
+
+
 def _issue_dir(uploads_dir: Path, user_id: int, issue_id: int) -> Path:
-    return uploads_dir / str(user_id) / str(issue_id)
+    return _safe_path(uploads_dir, f"{user_id}/{issue_id}")
 
 
 def save_image(
@@ -74,8 +84,8 @@ def save_image(
     filename: str,
 ) -> int:
     content_type, ext = sniff_image(data)
-    rel_path = Path(str(user_id)) / str(issue_id) / f"{uuid.uuid4().hex}.{ext}"
-    dest = uploads_dir / rel_path
+    rel_path = f"{user_id}/{issue_id}/{uuid.uuid4().hex}.{ext}"
+    dest = _safe_path(uploads_dir, rel_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
     try:
@@ -85,7 +95,7 @@ def save_image(
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (issue_id, Path(filename or f"image.{ext}").name[:200], content_type, len(data),
-             rel_path.as_posix(), utcnow()),
+             rel_path, utcnow()),
         )
         conn.execute("UPDATE issues SET updated_at = ? WHERE id = ?", (utcnow(), issue_id))
         conn.commit()
@@ -96,7 +106,7 @@ def save_image(
 
 
 def delete_image_file(uploads_dir: Path, rel_path: str) -> None:
-    (uploads_dir / rel_path).unlink(missing_ok=True)
+    _safe_path(uploads_dir, rel_path).unlink(missing_ok=True)
 
 
 def delete_issue_files(uploads_dir: Path, user_id: int, issue_id: int) -> None:
