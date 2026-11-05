@@ -61,7 +61,7 @@ def insert_issue(
     return cur.lastrowid
 
 
-def _safe_path(uploads_dir: Path, relative: str) -> Path:
+def safe_path(uploads_dir: Path, relative: str) -> Path:
     """Resolve ``relative`` under ``uploads_dir``, rejecting any escaping path."""
     root = os.path.realpath(str(uploads_dir))
     candidate = os.path.realpath(os.path.join(root, relative))
@@ -71,7 +71,7 @@ def _safe_path(uploads_dir: Path, relative: str) -> Path:
 
 
 def _issue_dir(uploads_dir: Path, user_id: int, issue_id: int) -> Path:
-    return _safe_path(uploads_dir, f"{user_id}/{issue_id}")
+    return safe_path(uploads_dir, f"{user_id}/{issue_id}")
 
 
 def save_image(
@@ -85,7 +85,7 @@ def save_image(
 ) -> int:
     content_type, ext = sniff_image(data)
     rel_path = f"{user_id}/{issue_id}/{uuid.uuid4().hex}.{ext}"
-    dest = _safe_path(uploads_dir, rel_path)
+    dest = safe_path(uploads_dir, rel_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(data)
     try:
@@ -106,7 +106,7 @@ def save_image(
 
 
 def delete_image_file(uploads_dir: Path, rel_path: str) -> None:
-    _safe_path(uploads_dir, rel_path).unlink(missing_ok=True)
+    safe_path(uploads_dir, rel_path).unlink(missing_ok=True)
 
 
 def delete_issue_files(uploads_dir: Path, user_id: int, issue_id: int) -> None:
