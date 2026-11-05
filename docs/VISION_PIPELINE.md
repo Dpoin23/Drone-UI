@@ -142,6 +142,8 @@ On first start, intruder detection downloads the stock COCO `yolov8n.pt` into `g
 
 ### Training
 
+See [TRAINING.md](TRAINING.md) for dataset downloads, GPU options and costs, cloud walkthroughs, and troubleshooting. Quick version:
+
 ```bash
 # Intruder detection: Ultralytics downloads and converts VisDrone (~2.3 GB)
 .venv/bin/python -m tools.train intruder --epochs 100 --device 0

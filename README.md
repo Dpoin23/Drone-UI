@@ -169,7 +169,7 @@ For the frontend dev server, `VITE_API_TARGET` overrides where `/api` is proxied
 ## Not built yet
 
 - The drone link: live telemetry and on-board detections (design plan milestone M2). Until then, GPS for detections comes from `POST /api/vision/telemetry`.
-- Trained VisDrone and MBDD2025 weights. The training tools are here, but the weights need a GPU run (see [docs/VISION_PIPELINE.md](docs/VISION_PIPELINE.md#training)).
+- Trained VisDrone and MBDD2025 weights. The training tools are here, but the weights need a GPU run (see [docs/TRAINING.md](docs/TRAINING.md)).
 - Recording or storing the livestream.
 - Live streams from YouTube and similar sites. Test video only plays recorded videos for now.
 - Image thumbnails. The list currently loads full-size images for its previews.
