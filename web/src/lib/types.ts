@@ -37,5 +37,21 @@ export type IssueDraft = {
 
 export type IssuePatch = Partial<Pick<Issue, 'title' | 'description' | 'severity' | 'status' | 'location'>>
 
-export type StreamTransport = 'demo' | 'webrtc' | 'mjpeg'
+export type StreamTransport = 'demo' | 'webrtc' | 'mjpeg' | 'video'
+/** For the `video` transport, `url` holds the id of a video in the account's library. */
 export type StreamSettings = { transport: StreamTransport; url: string }
+
+export type Video = {
+  id: number
+  title: string
+  source: 'upload' | 'url'
+  source_url: string
+  status: 'downloading' | 'ready' | 'error'
+  progress: number | null
+  error: string | null
+  content_type: string
+  size_bytes: number
+  duration_s: number | null
+  fps: number | null
+  created_at: string
+}

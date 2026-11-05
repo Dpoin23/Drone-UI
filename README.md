@@ -15,6 +15,7 @@ See [docs/DESIGN_PLAN.md](docs/DESIGN_PLAN.md) for the full architecture.
 The signed-in app has three tabs:
 
 - **Livestream**: video panel with a built-in **demo feed** (no drone needed), plus WebRTC (WHEP, for MediaMTX on the Pi) and MJPEG options. Stream settings are saved per account. Quick buttons log a security risk or maintenance issue straight from the feed, with a snapshot of the current frame attached, and a sidebar shows active issues.
+- **Test video** (a Livestream transport): plays recorded footage through the same feed display, so image processing can be tested without the drone. Under **Stream settings → Test video**, paste a YouTube link (or a link from most other video sites), or upload a file (MP4, MOV, WebM, MKV, Ogg). Links are downloaded to the ground station in the background. The player has play/pause, stop, ±10 s, frame-by-frame stepping, seeking, speed, loop, and mute. Keyboard shortcuts work once the player has focus: Space/K play/pause, J/L ±10 s, ←/→ ±5 s, `,`/`.` previous/next frame, Home stop, M mute.
 - **Security risks** and **Maintenance**: log, search, filter, and sort issues. Each entry can have images (JPEG, PNG, GIF, or WebP, up to 10 MB each), and the list previews the first one. Click an entry to change its status (open, acknowledged / in progress, resolved, false positive / dismissed), edit its severity, location, or notes, add or remove images, or delete it.
 
 ### Automated issue creation (planned)
@@ -42,6 +43,11 @@ cd ..
 ```
 
 On Debian/Ubuntu, if `python3 -m venv` fails, install `python3-venv` first (`sudo apt install python3-venv`).
+
+Importing from YouTube uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which is in `requirements.txt` (rerun the `pip install` line after pulling). yt-dlp needs a JavaScript runtime for YouTube. The Node.js you already have works, and so do Deno and Bun. **ffmpeg is optional:**
+
+- Without ffmpeg, YouTube imports are video-only (no sound), up to 1080p. That's all the image processing needs.
+- With ffmpeg (`sudo apt install ffmpeg`), video and audio are merged into one MP4.
 
 ## Run it (development)
 
@@ -100,6 +106,7 @@ npm run lint
 3. On **Livestream**, use **Log from feed → Maintenance**. The form should already have a snapshot of the current frame attached. Confirm the entry appears in the sidebar and on the **Maintenance** tab.
 4. Create a second account in a private window and confirm it sees none of the first account's entries.
 5. Under **Stream settings**, switch to MJPEG or WebRTC with your drone or MediaMTX URL, save, and reload. The setting should persist.
+6. Under **Stream settings → Test video**, import a YouTube link. It appears in the library with download progress, and you can save straight away, because the feed shows the progress and starts playing when the download is ready. Pause, step a few frames with `.`, and use **Log from feed**. The snapshot should be that exact frame. Then upload a local video file and switch to it.
 
 ### Testing against a real video stream
 
@@ -114,6 +121,8 @@ Environment variables for the backend:
 |---|---|---|
 | `DRONE_UI_DB` | `ground-station/data/drone-ui.db` | SQLite file. Delete it, and the uploads folder, to reset all accounts and data. |
 | `DRONE_UI_UPLOADS` | `ground-station/data/uploads` | Where issue images are stored on disk. |
+| `DRONE_UI_VIDEOS` | `ground-station/data/videos` | Test-video library (uploads and imported links), one folder per account. |
+| `DRONE_UI_MAX_VIDEO_MB` | `4096` | Largest test video that can be uploaded or imported. |
 | `DRONE_UI_WEB_DIST` | `web/dist` | Built UI to serve in single-server mode. |
 | `DRONE_UI_TOKEN_TTL_HOURS` | `168` (7 days) | How long a sign-in lasts. |
 
@@ -129,5 +138,7 @@ For the frontend dev server, `VITE_API_TARGET` overrides where `/api` is proxied
 
 - Live telemetry, and automatic issue creation from drone detections (design plan milestone M2). See [Automated issue creation](#automated-issue-creation-planned).
 - Recording or storing the livestream.
+- Live streams from YouTube and similar sites. Test video only plays recorded videos for now.
+- The image processing itself. Test videos are ready for it: the browser can read every frame (same origin, so canvas capture works), and the file is on disk under `DRONE_UI_VIDEOS` for a ground-side detector.
 - Image thumbnails. The list currently loads full-size images for its previews.
 - Map view.

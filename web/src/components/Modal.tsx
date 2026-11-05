@@ -22,7 +22,7 @@ export function Modal({ open, onClose, title, children, side = 'center' }: Props
   const container =
     side === 'right'
       ? 'fixed inset-y-0 right-0 flex w-full max-w-lg flex-col border-l border-line bg-panel shadow-2xl'
-      : 'relative w-full max-w-lg rounded-2xl border border-line bg-panel shadow-2xl'
+      : 'relative flex max-h-full w-full max-w-lg flex-col rounded-2xl border border-line bg-panel shadow-2xl'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -34,7 +34,7 @@ export function Modal({ open, onClose, title, children, side = 'center' }: Props
             <X className="size-5" />
           </button>
         </div>
-        <div className={side === 'right' ? 'flex-1 overflow-y-auto p-5' : 'p-5'}>{children}</div>
+        <div className="flex-1 overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   )

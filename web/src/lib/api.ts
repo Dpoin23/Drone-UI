@@ -1,4 +1,4 @@
-import type { Category, Issue, IssueDraft, IssuePatch, StreamSettings, User } from './types'
+import type { Category, Issue, IssueDraft, IssuePatch, StreamSettings, User, Video } from './types'
 
 const TOKEN_KEY = 'drone-ui.token'
 
@@ -91,4 +91,30 @@ export const api = {
   getStreamSettings: () => request<StreamSettings>('/api/stream-settings'),
   putStreamSettings: (settings: StreamSettings) =>
     request<StreamSettings>('/api/stream-settings', { method: 'PUT', body: JSON.stringify(settings) }),
+
+  listVideos: () => request<Video[]>('/api/videos'),
+  getVideo: (id: number) => request<Video>(`/api/videos/${id}`),
+  importVideo: (url: string) =>
+    request<Video>('/api/videos/import', { method: 'POST', body: JSON.stringify({ url }) }),
+  deleteVideo: (id: number) => request<void>(`/api/videos/${id}`, { method: 'DELETE' }),
+  videoPlaybackUrl: (id: number) => request<{ url: string; expires_at: number }>(`/api/videos/${id}/playback`),
+  uploadVideo: (file: File, onProgress?: (fraction: number) => void) =>
+    new Promise<Video>((resolve, reject) => {
+      // XHR rather than fetch: fetch can't report upload progress, and videos can be large.
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/videos/upload')
+      const token = tokenStore.get()
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      xhr.responseType = 'json'
+      xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total)
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) return resolve(xhr.response as Video)
+        if (xhr.status === 401 && token) onUnauthorized?.()
+        reject(new ApiError(xhr.status, errorMessage(xhr.response, `Upload failed (${xhr.status})`)))
+      }
+      xhr.onerror = () => reject(new ApiError(0, 'Cannot reach the ground station service'))
+      const form = new FormData()
+      form.append('file', file, file.name)
+      xhr.send(form)
+    }),
 }
