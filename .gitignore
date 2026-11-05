@@ -7,6 +7,11 @@ __pycache__/
 # Ground-station runtime data (SQLite DB, snapshots)
 ground-station/data/
 
+# Model weights and training output
+ground-station/models/
+ground-station/runs/
+ground-station/datasets/
+
 # Node
 node_modules/
 web/dist/
