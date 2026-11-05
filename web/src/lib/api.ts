@@ -1,4 +1,15 @@
-import type { Category, Issue, IssueDraft, IssuePatch, StreamSettings, User, Video } from './types'
+import type {
+  Category,
+  Issue,
+  IssueDraft,
+  IssuePatch,
+  StreamSettings,
+  User,
+  Video,
+  VisionCapabilities,
+  VisionSession,
+  VisionSettings,
+} from './types'
 
 const TOKEN_KEY = 'drone-ui.token'
 
@@ -91,6 +102,14 @@ export const api = {
   getStreamSettings: () => request<StreamSettings>('/api/stream-settings'),
   putStreamSettings: (settings: StreamSettings) =>
     request<StreamSettings>('/api/stream-settings', { method: 'PUT', body: JSON.stringify(settings) }),
+
+  getVisionCapabilities: () => request<VisionCapabilities>('/api/vision/capabilities'),
+  getVisionSettings: () => request<VisionSettings>('/api/vision/settings'),
+  putVisionSettings: (settings: VisionSettings) =>
+    request<VisionSettings>('/api/vision/settings', { method: 'PUT', body: JSON.stringify(settings) }),
+  getVisionSession: () => request<VisionSession>('/api/vision/session'),
+  startVision: () => request<VisionSession>('/api/vision/session', { method: 'POST' }),
+  stopVision: () => request<void>('/api/vision/session', { method: 'DELETE' }),
 
   listVideos: () => request<Video[]>('/api/videos'),
   getVideo: (id: number) => request<Video>(`/api/videos/${id}`),

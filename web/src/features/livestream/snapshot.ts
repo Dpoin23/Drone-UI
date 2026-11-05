@@ -1,14 +1,22 @@
+export type FeedElement = HTMLCanvasElement | HTMLVideoElement | HTMLImageElement
+
+/** The element showing the feed inside `stage`: the demo canvas, a `<video>`, or an MJPEG `<img>`. */
+export function findFeedElement(stage: HTMLElement | null): FeedElement | null {
+  return stage?.querySelector<FeedElement>('canvas:not([data-overlay]), video, img') ?? null
+}
+
+export function intrinsicSize(source: FeedElement): [number, number] {
+  if (source instanceof HTMLCanvasElement) return [source.width, source.height]
+  if (source instanceof HTMLVideoElement) return [source.videoWidth, source.videoHeight]
+  return [source.naturalWidth, source.naturalHeight]
+}
+
 /** Grab the current frame of whatever is playing inside `stage` as a JPEG file. */
 export async function captureFrame(stage: HTMLElement | null): Promise<File | null> {
-  const source = stage?.querySelector<HTMLCanvasElement | HTMLVideoElement | HTMLImageElement>('canvas, video, img')
+  const source = findFeedElement(stage)
   if (!source) return null
 
-  const [w, h] =
-    source instanceof HTMLCanvasElement
-      ? [source.width, source.height]
-      : source instanceof HTMLVideoElement
-        ? [source.videoWidth, source.videoHeight]
-        : [source.naturalWidth, source.naturalHeight]
+  const [w, h] = intrinsicSize(source)
   if (!w || !h) return null
 
   const canvas = document.createElement('canvas')

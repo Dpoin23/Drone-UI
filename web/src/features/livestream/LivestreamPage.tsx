@@ -5,20 +5,25 @@ import {
   Loader2,
   Maximize2,
   Radio,
+  ScanEye,
   Settings2,
   ShieldAlert,
   Wrench,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import { timeAgo } from '../../lib/format'
-import type { Category, StreamSettings, StreamTransport, Video } from '../../lib/types'
+import type { Category, StreamSettings, StreamTransport, Video, VisionAlert } from '../../lib/types'
 import { Modal } from '../../components/Modal'
 import { IssueForm } from '../issues/IssueForm'
 import { IssueThumb } from '../issues/ImageViews'
 import { OPEN_STATUSES, severityDot } from '../issues/meta'
 import { useIssues } from '../issues/useIssues'
+import { DetectionOverlay } from '../vision/DetectionOverlay'
+import { useFramePusher } from '../vision/useFramePusher'
+import { useVision } from '../vision/useVision'
+import { VisionPanel } from '../vision/VisionPanel'
 import { captureFrame } from './snapshot'
 import { VideoLibrary } from './VideoLibrary'
 import { VideoPlayer, type StreamStatus } from './VideoPlayer'
@@ -62,8 +67,33 @@ export function LivestreamPage() {
   const [quickLog, setQuickLog] = useState<{ category: Category; files: File[] } | null>(null)
   const [testVideo, setTestVideo] = useState<Video | null>(null)
   const [now, setNow] = useState(() => new Date())
-  const stageRef = useRef<HTMLDivElement>(null)
-  const { issues, loading: issuesLoading, create, addImages } = useIssues()
+  const [stage, setStage] = useState<HTMLDivElement | null>(null)
+  const [alert, setAlert] = useState<VisionAlert | null>(null)
+  const { issues, loading: issuesLoading, reload: reloadIssues, create, addImages } = useIssues()
+
+  const onAlert = useCallback(
+    (a: VisionAlert) => {
+      setAlert(a)
+      if (a.issue_id) reloadIssues()
+    },
+    [reloadIssues],
+  )
+  const vision = useVision(onAlert)
+  const { session } = vision
+  const frameError = useFramePusher({
+    socket: vision.socket,
+    stage,
+    enabled: session.running && session.frame_source === 'browser',
+    fps: session.running ? session.push_fps : 0,
+    maxWidth: session.running ? session.push_max_width : 1280,
+    sessionKey: session.running ? session.started_at : '',
+  })
+
+  useEffect(() => {
+    if (!alert) return
+    const id = setTimeout(() => setAlert(null), 6000)
+    return () => clearTimeout(id)
+  }, [alert])
 
   useEffect(() => {
     api
@@ -89,7 +119,7 @@ export function LivestreamPage() {
   }
 
   async function startQuickLog(category: Category) {
-    const snapshot = await captureFrame(stageRef.current)
+    const snapshot = await captureFrame(stage)
     setQuickLog({ category, files: snapshot ? [snapshot] : [] })
   }
 
@@ -143,7 +173,7 @@ export function LivestreamPage() {
         </div>
 
         <div className="panel overflow-hidden">
-          <div ref={stageRef} className="group relative aspect-video bg-black">
+          <div ref={setStage} className="group relative aspect-video bg-black">
             {saved ? (
               <VideoPlayer settings={saved} onStatus={onStatus} onVideo={setTestVideo} />
             ) : (
@@ -151,6 +181,12 @@ export function LivestreamPage() {
                 <Loader2 className="size-6 animate-spin" />
               </div>
             )}
+            <DetectionOverlay
+              stage={stage}
+              detections={vision.detections}
+              enabled={session.running}
+              syncMediaTime={session.running && session.frame_source === 'browser'}
+            />
 
             <div className="pointer-events-none absolute inset-0">
               <Corner className="top-4 left-4 border-t-2 border-l-2" />
@@ -162,12 +198,46 @@ export function LivestreamPage() {
                 <div className="absolute top-0 left-1/2 h-full w-px bg-white/30" />
               </div>
 
-              <div className="absolute top-6 left-8 flex items-center gap-2 rounded-md bg-black/50 px-2 py-1 font-mono text-xs backdrop-blur">
-                <span className={`size-2 rounded-full ${ui.dot}`} />
-                <span className="text-zinc-200">
-                  {saved?.transport === 'demo' ? 'DEMO' : isTestVideo ? 'TEST VIDEO' : ui.label.toUpperCase()}
-                </span>
+              <div className="absolute top-6 left-8 flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-md bg-black/50 px-2 py-1 font-mono text-xs backdrop-blur">
+                  <span className={`size-2 rounded-full ${ui.dot}`} />
+                  <span className="text-zinc-200">
+                    {saved?.transport === 'demo' ? 'DEMO' : isTestVideo ? 'TEST VIDEO' : ui.label.toUpperCase()}
+                  </span>
+                </div>
+                {session.running && (
+                  <div className="flex items-center gap-1.5 rounded-md bg-black/50 px-2 py-1 font-mono text-xs text-cyan-200 backdrop-blur">
+                    <ScanEye className="size-3.5" />
+                    {(vision.capabilities?.modes.find((m) => m.id === session.mode)?.label ?? session.mode).toUpperCase()}
+                    {vision.stats && session.workers.intruder.target_fps > 0 && (
+                      <span className="text-zinc-400">· {vision.stats.workers.intruder.actual_fps.toFixed(1)} fps</span>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {alert && (
+                <div className="absolute inset-x-0 top-16 flex justify-center">
+                  <div
+                    role="status"
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm backdrop-blur ${
+                      alert.category === 'security'
+                        ? 'border-rose-500/40 bg-rose-950/70 text-rose-100'
+                        : 'border-amber-500/40 bg-amber-950/70 text-amber-100'
+                    }`}
+                  >
+                    {alert.category === 'security' ? (
+                      <ShieldAlert className="size-4 text-rose-400" />
+                    ) : (
+                      <Wrench className="size-4 text-amber-400" />
+                    )}
+                    <span className="font-medium">{alert.title}</span>
+                    <span className="text-xs opacity-70">
+                      {Math.round(alert.confidence * 100)}%{alert.issue_id ? ' · logged' : ''}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="absolute top-6 right-8 rounded-md bg-black/50 px-2 py-1 font-mono text-xs text-zinc-200 backdrop-blur">
                 {now.toISOString().slice(0, 19).replace('T', ' ')}Z
               </div>
@@ -198,7 +268,7 @@ export function LivestreamPage() {
               </button>
               <button
                 className="btn-ghost px-2.5"
-                onClick={() => stageRef.current?.requestFullscreen?.()}
+                onClick={() => stage?.requestFullscreen?.()}
                 title="Fullscreen"
               >
                 <Maximize2 className="size-4" />
@@ -290,6 +360,8 @@ export function LivestreamPage() {
       </Modal>
 
       <aside className="space-y-4">
+        <VisionPanel vision={vision} frameError={frameError} />
+
         <div className="panel p-4">
           <h2 className="text-sm font-semibold text-zinc-100">Log from feed</h2>
           <p className="mt-0.5 mb-3 text-xs text-zinc-500">Attaches a snapshot of the current frame.</p>

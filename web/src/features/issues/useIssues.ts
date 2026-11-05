@@ -7,6 +7,7 @@ export function useIssues(category?: Category) {
   const [issues, setIssues] = useState<Issue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [version, setVersion] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -22,7 +23,10 @@ export function useIssues(category?: Category) {
     return () => {
       cancelled = true
     }
-  }, [category])
+  }, [category, version])
+
+  /** Re-fetch, e.g. after the detection pipeline logged an issue. */
+  const reload = useCallback(() => setVersion((v) => v + 1), [])
 
   const create = useCallback(async (draft: IssueDraft) => {
     const created = await api.createIssue(draft)
@@ -59,5 +63,5 @@ export function useIssues(category?: Category) {
     return updated
   }, [])
 
-  return { issues, loading, error, create, update, remove, addImages, removeImage }
+  return { issues, loading, error, reload, create, update, remove, addImages, removeImage }
 }

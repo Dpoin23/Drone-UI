@@ -74,8 +74,8 @@ export function IssuesPage({ category }: { category: Category }) {
 
       <div className="flex items-center gap-2 rounded-lg border border-line bg-white/[0.02] px-3 py-2 text-xs text-zinc-400">
         <Radar className="size-4 shrink-0 text-cyan-400" />
-        Entries will be created automatically from livestream and drone detections once the drone link is connected.
-        You can still log entries manually.
+        Entries are created automatically when image processing is running on the Livestream tab, with a snapshot,
+        time, and GPS position. You can still log entries manually.
       </div>
 
       <div className="panel">
