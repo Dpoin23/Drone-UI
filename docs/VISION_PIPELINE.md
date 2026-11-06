@@ -142,7 +142,14 @@ On first start, intruder detection downloads the stock COCO `yolov8n.pt` into `g
 
 ### Training
 
-See [TRAINING.md](TRAINING.md) for dataset downloads, GPU options and costs, cloud walkthroughs, and troubleshooting. Quick version:
+See [TRAINING.md](TRAINING.md) for dataset downloads, GPU options and costs, cloud walkthroughs, and troubleshooting. On a Linux or WSL2 machine with an NVIDIA GPU, one command does the whole run: setup, both datasets, a smoke test, both trainings, benchmarks, a results bundle, and a GitHub Release with the weights. Other clones install those weights with `fetch-models.sh`.
+
+```bash
+./scripts/train-models.sh     # on the GPU machine
+./scripts/fetch-models.sh     # on every other machine
+```
+
+The individual steps, run from `ground-station/`:
 
 ```bash
 # Intruder detection: Ultralytics downloads and converts VisDrone (~2.3 GB)
