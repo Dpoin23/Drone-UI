@@ -2,5 +2,5 @@
 # On a laptop without an NVIDIA GPU, install the much smaller CPU build of PyTorch first:
 #   .venv/bin/pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 -r requirements.txt
-ultralytics>=8.4.0
+ultralytics>=8.4.204
 lap>=0.5.12
