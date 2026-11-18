@@ -11,8 +11,9 @@ See [docs/DESIGN_PLAN.md](docs/DESIGN_PLAN.md) for the full architecture, and [d
 | `ground-station/` | Python / FastAPI backend. Accounts, sign-in tokens, and per-account storage in SQLite. Ground-side image processing (YOLO + ByteTrack) in `app/vision/`, with training and benchmark tools in `tools/`. |
 | `web/` | React + TypeScript + Vite + Tailwind frontend (dark theme). |
 | `scripts/dev.sh` | Starts both for local development. |
-| `scripts/train-models.sh` | Trains the vision models end to end on a local NVIDIA GPU and publishes them as a GitHub Release (see [docs/TRAINING.md](docs/TRAINING.md)). |
-| `scripts/fetch-models.sh` | Installs the newest published model weights into `ground-station/models/`. |
+| `scripts/train-models.sh` | Trains the vision models end to end on a local NVIDIA GPU (see [docs/TRAINING.md](docs/TRAINING.md)). |
+| `scripts/fetch-models.sh` | Optional: replaces in-repo weights from a `models-*` GitHub Release (`--force`). |
+| `docs/TRAINED-MODELS.md` | Metrics and notes for the fine-tuned checkpoints that ship under `ground-station/models/`. |
 
 The signed-in app has three tabs:
 
@@ -110,7 +111,7 @@ On the **Livestream** tab, pick a **Flight mode** in the **Image processing** pa
 
 The rates are starting targets. Edit them under **Processing settings** to suit the laptop. The panel shows each detector's actual FPS, inference time, and skipped frames. Processing works with every feed type: the ground station decodes WebRTC (through MediaMTX's RTSP port) and MJPEG streams itself, and the browser sends frames for the demo feed and test videos, so detections follow pause, seek, and frame stepping.
 
-Models: intruder detection starts with the stock COCO `yolov8n.pt`, downloaded on first use. Maintenance detection needs weights trained on MBDD2025. `tools/train.py` trains both (VisDrone and MBDD2025), `scripts/train-models.sh` runs the whole training path on a local NVIDIA GPU and publishes the weights, `scripts/fetch-models.sh` installs the published weights, and `tools/benchmark.py` measures mAP, precision, recall, FPS, and latency. To GPS-tag detections, post the drone's position to `POST /api/vision/telemetry`. [docs/VISION_PIPELINE.md](docs/VISION_PIPELINE.md) covers the architecture, training, benchmarking, the Pi-side MediaMTX setup, and all settings.
+Models: fine-tuned VisDrone and MBDD2025 weights ship in `ground-station/models/` (see [docs/TRAINED-MODELS.md](docs/TRAINED-MODELS.md)). Stock COCO `yolov8n.pt` is only a fallback, downloaded on first use if the VisDrone file is missing. `tools/train.py` and `scripts/train-models.sh` retrain both detectors; `scripts/fetch-models.sh --force` can pull a later GitHub Release over the in-repo files; `tools/benchmark.py` measures mAP, precision, recall, FPS, and latency. To GPS-tag detections, post the drone's position to `POST /api/vision/telemetry`. [docs/VISION_PIPELINE.md](docs/VISION_PIPELINE.md) covers the architecture, training, benchmarking, the Pi-side MediaMTX setup, and all settings.
 
 ## Testing
 
@@ -171,7 +172,6 @@ For the frontend dev server, `VITE_API_TARGET` overrides where `/api` is proxied
 ## Not built yet
 
 - The drone link: live telemetry and on-board detections (design plan milestone M2). Until then, GPS for detections comes from `POST /api/vision/telemetry`.
-- Trained VisDrone and MBDD2025 weights. The training tools are here, but the weights need a GPU run (see [docs/TRAINING.md](docs/TRAINING.md)).
 - Recording or storing the livestream.
 - Live streams from YouTube and similar sites. Test video only plays recorded videos for now.
 - Image thumbnails. The list currently loads full-size images for its previews.

@@ -138,15 +138,16 @@ cd ground-station
 .venv/bin/pip install -r requirements-vision.txt
 ```
 
-On first start, intruder detection downloads the stock COCO `yolov8n.pt` into `ground-station/models/`. Its person and vehicle classes work for testing, but they're trained on ground-level photos. Train VisDrone weights for aerial footage. Maintenance detection stays unavailable until MBDD2025 weights exist.
+Fine-tuned VisDrone and MBDD2025 weights ship in `ground-station/models/` (see [TRAINED-MODELS.md](TRAINED-MODELS.md)). If the VisDrone file is missing, intruder detection falls back to stock COCO `yolov8n.pt` (downloaded on first start). Maintenance detection stays unavailable until `yolov8n-mbdd2025.pt` is present.
 
 ### Training
 
-See [TRAINING.md](TRAINING.md) for dataset downloads, GPU options and costs, cloud walkthroughs, and troubleshooting. On a Linux or WSL2 machine with an NVIDIA GPU, one command does the whole run: setup, both datasets, a smoke test, both trainings, benchmarks, a results bundle, and a GitHub Release with the weights. Other clones install those weights with `fetch-models.sh`.
+See [TRAINING.md](TRAINING.md) for dataset downloads, GPU options and costs, cloud walkthroughs, and troubleshooting. On a Linux or WSL2 machine with an NVIDIA GPU, one command does the whole run: setup, both datasets, a smoke test, both trainings, benchmarks, and a results bundle. Commit the two updated `.pt` files (or publish a release and pull with `fetch-models.sh --force`).
 
 ```bash
-./scripts/train-models.sh     # on the GPU machine
-./scripts/fetch-models.sh     # on every other machine
+./scripts/train-models.sh --no-publish   # on the GPU machine
+# then commit ground-station/models/yolov8n-*.pt, or publish and:
+./scripts/fetch-models.sh --force
 ```
 
 The individual steps, run from `ground-station/`:

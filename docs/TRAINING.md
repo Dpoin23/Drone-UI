@@ -1,15 +1,10 @@
 # Training the vision models
 
-The detectors work out of the box, but not at their best:
-
-- **Intruder detection** falls back to the stock COCO `yolov8n.pt`. Its person and vehicle classes are trained on ground-level photos, so aerial footage is harder.
-- **Maintenance detection** is unavailable until MBDD2025 weights exist.
-
-This guide covers what to train, where to get the data, and the cheapest ways to get the compute. For how training fits into the running pipeline, see [VISION_PIPELINE.md](VISION_PIPELINE.md#training).
+The detectors work out of the box with the fine-tuned weights that ship in the repo. This guide covers how to retrain them, where to get the data, and the cheapest ways to get the compute. For how training fits into the running pipeline, see [VISION_PIPELINE.md](VISION_PIPELINE.md#training). Metrics and handoff notes for the current checkpoints are in [TRAINED-MODELS.md](TRAINED-MODELS.md).
 
 **Training on your own NVIDIA GPU** Go straight to [Train on an RTX 4080](#train-on-an-rtx-4080). One script does the whole run.
 
-Weights are not committed to the repo. They live in `ground-station/models/`, which is ignored by Git. Trained weights are shared as GitHub Releases (tagged `models-<date>`), and `./scripts/fetch-models.sh` installs the newest ones on any clone.
+The fine-tuned checkpoints (`yolov8n-visdrone.pt`, `yolov8n-mbdd2025.pt`) are committed under `ground-station/models/` (~6 MB each). Stock COCO `yolov8n.pt`, datasets, and `runs/` stay gitignored. After a new training run you can either commit the updated `.pt` files, or publish a `models-<date>` GitHub Release and pull it with `./scripts/fetch-models.sh --force`.
 
 ## What you need to produce
 
@@ -34,7 +29,7 @@ This is the recommended path. `scripts/train-models.sh` runs the whole thing on 
 6. Trains intruder detection (VisDrone), then maintenance detection (MBDD2025), 100 epochs each.
 7. Measures mAP, precision, and recall on each validation split.
 8. Packs the trained weights, the accuracy numbers, and the training curves into one `.tar.gz` file.
-9. Publishes the weights and that bundle as a GitHub Release, so everyone on the team can install them with `./scripts/fetch-models.sh`.
+9. Optionally publishes the weights and that bundle as a GitHub Release (skip with `--no-publish`). Prefer committing the two `.pt` files when they change; releases remain useful for one-off handoffs.
 
 The script is safe to rerun. Finished steps are skipped. If training stops partway (Ctrl-C, a crash, a Windows Update reboot), running the same command again resumes from the last completed epoch.
 
@@ -497,14 +492,17 @@ Expect roughly $1–4 total for both datasets at the baseline settings.
 
 ## Use the trained weights
 
-On any clone of the repo, download the newest published weights into `ground-station/models/`:
+A normal clone already has `ground-station/models/yolov8n-visdrone.pt` and `yolov8n-mbdd2025.pt`. See [TRAINED-MODELS.md](TRAINED-MODELS.md) for metrics and verification.
+
+To replace them from a published release (or restore missing files):
 
 ```bash
-./scripts/fetch-models.sh                         # newest release that has each file
+./scripts/fetch-models.sh                         # no-op if both files already exist
+./scripts/fetch-models.sh --force                 # newest models-* release that has each file
 ./scripts/fetch-models.sh models-20261105-2210    # a specific release
 ```
 
-It uses `gh` when you're signed in, and plain `curl` otherwise, which works while the repo is public. The training curves and confusion matrices are in the release's `drone-ui-weights-*.tar.gz`.
+It uses `gh` when you're signed in, and plain `curl` otherwise, which works while the repo is public. The training curves and confusion matrices are in a release's (or handoff) `drone-ui-weights-*.tar.gz`.
 
 A bundle received by hand unpacks straight into place. It also adds the curves and benchmarks under `runs/`, which Git ignores:
 

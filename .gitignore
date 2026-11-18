@@ -7,8 +7,12 @@ __pycache__/
 # Ground-station runtime data (SQLite DB, snapshots)
 ground-station/data/
 
-# Model weights and training output
-ground-station/models/
+# Model weights and training output.
+# The two fine-tuned detectors ship in-repo (~6 MB each); stock COCO and
+# anything else under models/ stays local/gitignored.
+ground-station/models/*
+!ground-station/models/yolov8n-visdrone.pt
+!ground-station/models/yolov8n-mbdd2025.pt
 ground-station/runs/
 ground-station/datasets/
 

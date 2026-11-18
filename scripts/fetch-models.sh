@@ -1,18 +1,46 @@
 #!/usr/bin/env bash
-# Download the trained vision weights published by scripts/train-models.sh into ground-station/models/.
-# Takes the newest models-* GitHub Release that has each file, or the release named as the argument.
+# Ensure trained vision weights are present in ground-station/models/.
+# The fine-tuned checkpoints ship in the repo. This script is for replacing
+# them from a models-* GitHub Release (newer training run), or for clones
+# that somehow lost the files.
+#
+# Usage:
+#   scripts/fetch-models.sh                 # no-op if both files already exist
+#   scripts/fetch-models.sh --force         # re-download newest models-* release
+#   scripts/fetch-models.sh models-YYYYMMDD-HHMM
 set -euo pipefail
 
-if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
-  echo "Usage: scripts/fetch-models.sh [models-YYYYMMDD-HHMM]"
-  exit 0
-fi
-TAG="${1:-}"
+FORCE=0
+TAG=""
+for arg in "$@"; do
+  case "$arg" in
+    -h|--help)
+      echo "Usage: scripts/fetch-models.sh [--force] [models-YYYYMMDD-HHMM]"
+      exit 0
+      ;;
+    --force) FORCE=1 ;;
+    *) TAG="$arg" ;;
+  esac
+done
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="$ROOT/ground-station/models"
 REPO="${DRONE_UI_REPO:-$(git -C "$ROOT" remote get-url origin | sed -E 's#^(git@github\.com:|https://github\.com/)##; s#\.git$##')}"
 mkdir -p "$DEST"
+
+NAMES=(yolov8n-visdrone.pt yolov8n-mbdd2025.pt)
+missing=()
+for name in "${NAMES[@]}"; do
+  if [[ ! -f "$DEST/$name" ]]; then
+    missing+=("$name")
+  fi
+done
+
+if [[ $FORCE -eq 0 && -z "$TAG" && ${#missing[@]} -eq 0 ]]; then
+  echo "Trained weights already present in $DEST (shipped with the repo)."
+  echo "Pass --force or a release tag to replace them from a GitHub Release."
+  exit 0
+fi
 
 # gh works for private repos too; plain curl is enough while the repo is public.
 use_gh=0
@@ -37,7 +65,12 @@ for name in ("yolov8n-visdrone.pt", "yolov8n-mbdd2025.pt"):
 ' "$TAG" <<<"$releases")
 
 if [[ -z "$picks" ]]; then
-  echo "No published weights found on github.com/$REPO${TAG:+ under $TAG}. Train them with scripts/train-models.sh." >&2
+  if [[ ${#missing[@]} -eq 0 ]]; then
+    echo "No models-* GitHub Release found on github.com/$REPO; keeping the in-repo weights in $DEST." >&2
+    exit 0
+  fi
+  echo "No published weights found on github.com/$REPO${TAG:+ under $TAG}, and these files are missing: ${missing[*]}." >&2
+  echo "Train with scripts/train-models.sh, or unpack a drone-ui-weights-*.tar.gz into ground-station/." >&2
   exit 1
 fi
 
